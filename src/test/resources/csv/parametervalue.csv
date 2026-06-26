@@ -1,0 +1,6 @@
+parameter.id;data;node.id;subscription.id!
+service:registry:nexus:url;http://localhost:8120;service:registry:nexus:dig;
+service:registry:nexus:user;junit;service:registry:nexus:dig;
+service:registry:nexus:password;secret;service:registry:nexus:dig;
+service:registry:nexus:type;maven;;1
+service:registry:nexus:registry;maven-releases;;1

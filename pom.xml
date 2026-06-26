@@ -1,0 +1,44 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.ligoj.api</groupId>
+        <artifactId>plugin-parent</artifactId>
+        <version>4.3.1</version>
+        <relativePath />
+    </parent>
+
+    <groupId>org.ligoj.plugin</groupId>
+    <artifactId>plugin-registry-nexus</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>Ligoj - Plugin Registry - Nexus</name>
+    <url>https://github.com/ligoj/plugin-registry-nexus</url>
+
+    <scm>
+        <connection>scm:git:https://github.com/ligoj/plugin-registry-nexus</connection>
+        <developerConnection>scm:git:https://github.com/ligoj/plugin-registry-nexus</developerConnection>
+        <url>https://github.com/ligoj/plugin-registry-nexus.git</url>
+    </scm>
+
+    <profiles>
+        <profile>
+            <id>github</id>
+            <distributionManagement>
+                <repository>
+                    <id>github-ligoj</id>
+                    <url>https://maven.pkg.github.com/ligoj/plugin-registry-nexus</url>
+                </repository>
+            </distributionManagement>
+        </profile>
+    </profiles>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.ligoj.plugin</groupId>
+            <artifactId>plugin-registry</artifactId>
+            <version>[1.0.0-SNAPSHOT,1.1.0)</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

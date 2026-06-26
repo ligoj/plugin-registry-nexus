@@ -1,0 +1,6 @@
+id;owner.id;data;mandatory;type;mode;secured;defaultValue;availableForSubscription;availableForNode
+service:registry:nexus:url;service:registry:nexus;;true;TEXT;;;;FALSE;
+service:registry:nexus:user;service:registry:nexus;;true;TEXT;;;;FALSE;
+service:registry:nexus:password;service:registry:nexus;;true;TEXT;;true;;FALSE;
+service:registry:nexus:type;service:registry:nexus;["docker","maven","nuget","npm","python"];true;SELECT;;;;;FALSE
+service:registry:nexus:registry;service:registry:nexus;;true;TEXT;;;;;FALSE

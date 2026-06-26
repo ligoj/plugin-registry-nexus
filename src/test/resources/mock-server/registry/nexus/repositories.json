@@ -1,0 +1,14 @@
+[
+  {
+    "name": "maven-releases",
+    "format": "maven2",
+    "type": "hosted",
+    "url": "http://localhost:8120/repository/maven-releases"
+  },
+  {
+    "name": "npm-proxy",
+    "format": "npm",
+    "type": "proxy",
+    "url": "http://localhost:8120/repository/npm-proxy"
+  }
+]

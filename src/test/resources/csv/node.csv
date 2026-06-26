@@ -1,0 +1,4 @@
+id;name;refined.id;mode;uiClasses;tag;tagUiClasses
+service:registry;Registry;;LINK;fas fa-box-open;technical;fa fa-industry
+service:registry:nexus;Nexus;service:registry;LINK;;;
+service:registry:nexus:dig;Nexus DIG;service:registry:nexus;LINK;;;
