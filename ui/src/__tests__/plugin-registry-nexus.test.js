@@ -54,9 +54,11 @@ describe('plugin-registry-nexus manifest', () => {
     expect(() => def.feature('nope')).toThrow(/Plugin "registry-nexus" has no feature "nope"/)
   })
 
-  it('parameterLayout orders type before registry in link mode only', () => {
-    expect(def.feature('parameterLayout', { mode: 'link' }))
+  it('parameterLayout orders type before registry only on a link subscription', () => {
+    expect(def.feature('parameterLayout', { mode: 'link', isNode: false }))
       .toEqual([{ parameters: ['service:registry:nexus:type', 'service:registry:nexus:registry'] }])
+    // Node context defers to the parent registry's connection ordering.
+    expect(def.feature('parameterLayout', { mode: 'link', isNode: true })).toEqual([])
     expect(def.feature('parameterLayout', { mode: 'create' })).toEqual([])
     expect(def.feature('parameterLayout', {})).toEqual([])
   })

@@ -89,10 +89,12 @@ function renderDetailsFeatures(subscription) {
 /**
  * Subscribe-wizard parameter layout. At subscription time in LINK mode, show
  * the repository type before the registry (the wizard's default is name
- * ascending). Other modes keep the default order.
+ * ascending). In node context (isNode) we return nothing so the parent
+ * registry plugin's connection ordering (url, user, secret) applies; other
+ * subscription modes keep the default order.
  */
-function parameterLayout({ mode } = {}) {
-  return String(mode).toLowerCase() === 'link' ? [{ parameters: [PARAM_TYPE, PARAM_REGISTRY] }] : []
+function parameterLayout({ mode, isNode } = {}) {
+  return !isNode && String(mode).toLowerCase() === 'link' ? [{ parameters: [PARAM_TYPE, PARAM_REGISTRY] }] : []
 }
 
 export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout }
