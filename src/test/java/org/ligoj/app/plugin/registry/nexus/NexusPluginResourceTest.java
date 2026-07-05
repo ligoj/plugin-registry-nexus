@@ -136,16 +136,31 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	@Test
 	void findAllByName() throws IOException {
 		prepareMockRepositories();
-		final var repositories = resource.findAllByName("service:registry:nexus:dig", "maven");
+		final var repositories = resource.findAllByName("service:registry:nexus:dig", "maven", null);
 		Assertions.assertEquals(1, repositories.size());
 		Assertions.assertEquals("maven-releases", repositories.getFirst().getId());
 		Assertions.assertEquals("maven-releases", repositories.getFirst().getName());
 	}
 
 	@Test
+	void findAllByNameFilteredByType() throws IOException {
+		prepareMockRepositories();
+		// Criteria "m" matches both mock repositories (maven-releases, npm-proxy) by
+		// name; the artifact type then narrows to a single Nexus format.
+		Assertions.assertEquals(2, resource.findAllByName("service:registry:nexus:dig", "m", null).size());
+		Assertions.assertEquals(2, resource.findAllByName("service:registry:nexus:dig", "m", " ").size());
+		final var maven = resource.findAllByName("service:registry:nexus:dig", "m", "maven"); // maven → maven2
+		Assertions.assertEquals(1, maven.size());
+		Assertions.assertEquals("maven-releases", maven.getFirst().getName());
+		final var npm = resource.findAllByName("service:registry:nexus:dig", "m", "npm");
+		Assertions.assertEquals(1, npm.size());
+		Assertions.assertEquals("npm-proxy", npm.getFirst().getName());
+	}
+
+	@Test
 	void findAllByNameNoListing() throws IOException {
 		httpServer.start();
-		final var repositories = resource.findAllByName("service:registry:nexus:dig", "maven");
+		final var repositories = resource.findAllByName("service:registry:nexus:dig", "maven", null);
 		Assertions.assertEquals(0, repositories.size());
 	}
 

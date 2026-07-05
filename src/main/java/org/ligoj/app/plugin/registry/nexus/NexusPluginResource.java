@@ -10,6 +10,7 @@ import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 import org.apache.commons.lang3.StringUtils;
@@ -77,6 +78,12 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	 * Target repository/registry (subscription level).
 	 */
 	public static final String PARAMETER_REGISTRY = KEY + ":registry";
+
+	/**
+	 * UI artifact type → Nexus repository format, for the ones Nexus names
+	 * differently. Types not listed use their own (lower-cased) name.
+	 */
+	private static final Map<String, String> UI_TYPE_TO_FORMAT = Map.of("maven", "maven2", "python", "pypi");
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -181,13 +188,16 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	 *
 	 * @param node     The node identifier holding the registry parameters.
 	 * @param criteria The search criteria.
+	 * @param type     Optional artifact type (docker, maven, npm, …) to filter the
+	 *                 repositories by their Nexus format. When blank, all formats
+	 *                 match.
 	 * @return The matching repository names.
 	 * @throws IOException When the Nexus response cannot be read.
 	 */
 	@GET
 	@Path("{node}/{criteria}")
 	public List<NamedBean<String>> findAllByName(@PathParam("node") final String node,
-			@PathParam("criteria") final String criteria) throws IOException {
+			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) throws IOException {
 		final var parameters = pvResource.getNodeParameters(node);
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/service/rest/v1/repositories",
 				null);
@@ -204,12 +214,24 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 					});
 			final var format = new NormalizeFormat();
 			final var formatCriteria = format.format(criteria);
+			final var wantedFormat = toNexusFormat(type);
 			return inMemoryPagination
 					.newPage(repositories.stream().filter(r -> format.format(r.getName()).contains(formatCriteria))
+							.filter(r -> wantedFormat == null || wantedFormat.equalsIgnoreCase(r.getFormat()))
 							.map(r -> new NamedBean<>(r.getName(), r.getName())).toList(), PageRequest.of(0, 10))
 					.getContent();
 		}
 		return Collections.emptyList();
+	}
+
+	/**
+	 * Map a UI artifact type to the Nexus repository format. Nexus names a few
+	 * formats differently (maven → maven2, python → pypi); the rest match. A
+	 * blank type (no filter) yields <code>null</code>.
+	 */
+	private String toNexusFormat(final String type) {
+		final var t = StringUtils.trimToNull(type);
+		return t == null ? null : UI_TYPE_TO_FORMAT.getOrDefault(t.toLowerCase(), t.toLowerCase());
 	}
 
 }

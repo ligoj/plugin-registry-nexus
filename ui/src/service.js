@@ -14,7 +14,7 @@
  * Kept free of Vue SFC imports so it can be unit-tested without a DOM.
  */
 import { h } from 'vue'
-import { renderServiceLink, renderDetailsChip, useI18nStore, VChip, VIcon, VTooltip } from '@ligoj/host'
+import { pluginRegistry, renderServiceLink, renderDetailsChip, useI18nStore, VChip, VIcon, VTooltip } from '@ligoj/host'
 
 const PARAM_URL = 'service:registry:nexus:url'
 const PARAM_TYPE = 'service:registry:nexus:type'
@@ -28,15 +28,6 @@ const PARAM_REGISTRY = 'service:registry:nexus:registry'
  */
 const TYPE_VALUES = ['docker', 'maven', 'nuget', 'npm', 'python']
 
-/** Artifact-type → icon. Shared shape across the registry tools. */
-const TYPE_ICONS = {
-  docker: 'mdi-docker',
-  maven: 'mdi-language-java',
-  nuget: 'mdi-nuget',
-  npm: 'mdi-npm',
-  python: 'mdi-language-python',
-}
-
 /**
  * Resolve the stored artifact type. A SELECT is persisted as its option INDEX
  * (e.g. "1"), so map that back to the value; a value passed straight through
@@ -46,9 +37,19 @@ function resolveType(raw) {
   return String(TYPE_VALUES[Number(raw)] ?? raw ?? '').toLowerCase()
 }
 
-/** Icon of a (resolved) artifact type, with a generic package fallback. */
-function typeIcon(type) {
-  return TYPE_ICONS[type] || 'mdi-package-variant'
+/**
+ * Artifact-type icon as a VNode, drawn by the shared RegistryTypeIcon that the
+ * parent plugin-registry hosts (a plugin can't import another plugin's SFC, so
+ * we ask the parent via its `renderTypeIcon` feature). Falls back to a generic
+ * package icon if the parent isn't loaded / is too old. `attrs` forwards
+ * size / start / class through to the icon.
+ */
+function typeIconVNode(type, attrs = {}) {
+  const registry = pluginRegistry.get('registry')
+  if (registry) {
+    try { return registry.feature('renderTypeIcon', { type, ...attrs }) } catch { /* older parent without the feature */ }
+  }
+  return h(VIcon, attrs, () => 'mdi-package-variant')
 }
 
 /** "Home" link to the Nexus web UI (the main tool resource). */
@@ -68,12 +69,11 @@ function renderDetailsKey(subscription) {
   const registry = params?.[PARAM_REGISTRY]
   if (!registry) return null
   const type = resolveType(params[PARAM_TYPE])
-  const icon = typeIcon(type)
   return h(VTooltip, { location: 'bottom' }, {
     activator: ({ props }) => h(VChip, { ...props, size: 'small', variant: 'tonal', class: 'mr-1' },
-      () => [h(VIcon, { start: true, size: 'small' }, () => icon), ' ', registry]),
+      () => [typeIconVNode(type, { start: true, size: 'small' }), ' ', registry]),
     default: () => (type
-      ? [h('div', { class: 'd-flex align-center ga-1' }, [h(VIcon, { size: 'x-small' }, () => icon), type]), h('div', registry)]
+      ? [h('div', { class: 'd-flex align-center ga-1' }, [typeIconVNode(type, { size: 'x-small' }), type]), h('div', registry)]
       : [h('div', registry)]),
   })
 }
