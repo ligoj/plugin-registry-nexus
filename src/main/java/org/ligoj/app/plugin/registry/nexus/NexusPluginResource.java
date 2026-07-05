@@ -17,6 +17,7 @@ import org.apache.commons.lang3.Strings;
 import org.ligoj.app.api.SubscriptionStatusWithData;
 import org.ligoj.app.plugin.registry.RegistryResource;
 import org.ligoj.app.plugin.registry.RegistryServicePlugin;
+import org.ligoj.app.plugin.registry.nexus.client.NexusComponentPage;
 import org.ligoj.app.plugin.registry.nexus.client.NexusRepository;
 import org.ligoj.app.resource.NormalizeFormat;
 import org.ligoj.app.resource.plugin.AbstractToolPluginResource;
@@ -144,7 +145,35 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 		final var repository = validateRegistry(parameters);
 		status.put("format", repository.getFormat());
 		status.put("type", repository.getType());
+		status.put("components", countComponents(parameters, parameters.get(PARAMETER_REGISTRY)));
 		return status;
+	}
+
+	/**
+	 * Count the components hosted by the given repository, paging through the
+	 * continuation-token based components listing.
+	 *
+	 * @param parameters The node/subscription parameters.
+	 * @param registry   The repository name.
+	 * @return The total number of components.
+	 * @throws IOException When a Nexus response cannot be read.
+	 */
+	private int countComponents(final Map<String, String> parameters, final String registry) throws IOException {
+		int total = 0;
+		String token = null;
+		do {
+			final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/service/rest/v1/components?repository="
+					+ registry + (token == null ? "" : "&continuationToken=" + token), null);
+			request.setSaveResponse(true);
+			try (var processor = newProcessor(parameters)) {
+				processor.process(request);
+			}
+			final var page = objectMapper.readValue(StringUtils.defaultIfBlank(request.getResponse(), "{}"),
+					NexusComponentPage.class);
+			total += page.getItems().size();
+			token = page.getContinuationToken();
+		} while (token != null);
+		return total;
 	}
 
 	/**

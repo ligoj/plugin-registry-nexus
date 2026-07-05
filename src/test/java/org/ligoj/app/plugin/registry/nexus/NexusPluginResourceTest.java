@@ -1,6 +1,8 @@
 package org.ligoj.app.plugin.registry.nexus;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
@@ -122,10 +124,13 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	@Test
 	void checkSubscriptionStatus() throws IOException {
 		prepareMockRepository();
+		prepareMockComponents();
 		final var status = resource.checkSubscriptionStatus(subscriptionResource.getParametersNoCheck(subscription));
 		Assertions.assertTrue(status.getStatus().isUp());
 		Assertions.assertEquals("maven2", status.getData().get("format"));
 		Assertions.assertEquals("hosted", status.getData().get("type"));
+		// 3 components on the first page + 2 on the second (continuation token)
+		Assertions.assertEquals(5, status.getData().get("components"));
 	}
 
 	@Test
@@ -159,6 +164,20 @@ class NexusPluginResourceTest extends AbstractServerTest {
 				.withBody(IOUtils.toString(
 						new ClassPathResource("mock-server/registry/nexus/repositories.json").getInputStream(),
 						StandardCharsets.UTF_8))));
+		httpServer.start();
+	}
+
+	/**
+	 * Two-pages components listing: the first page carries a continuation token
+	 * pointing to the (last) second page, exercising the paging loop.
+	 */
+	private void prepareMockComponents() {
+		httpServer.stubFor(get(urlPathEqualTo("/service/rest/v1/components"))
+				.withQueryParam("continuationToken", absent()).willReturn(aResponse().withStatus(HttpStatus.SC_OK)
+						.withBody("{\"items\":[{},{},{}],\"continuationToken\":\"TOKEN2\"}")));
+		httpServer.stubFor(get(urlPathEqualTo("/service/rest/v1/components"))
+				.withQueryParam("continuationToken", equalTo("TOKEN2")).willReturn(aResponse()
+						.withStatus(HttpStatus.SC_OK).withBody("{\"items\":[{},{}],\"continuationToken\":null}")));
 		httpServer.start();
 	}
 
