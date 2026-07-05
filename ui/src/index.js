@@ -20,6 +20,7 @@ const features = {
   renderFeatures: service.renderFeatures,
   renderDetailsKey: service.renderDetailsKey,
   renderDetailsFeatures: service.renderDetailsFeatures,
+  parameterLayout: service.parameterLayout,
 }
 
 export default {

@@ -54,6 +54,13 @@ describe('plugin-registry-nexus manifest', () => {
     expect(() => def.feature('nope')).toThrow(/Plugin "registry-nexus" has no feature "nope"/)
   })
 
+  it('parameterLayout orders type before registry in link mode only', () => {
+    expect(def.feature('parameterLayout', { mode: 'link' }))
+      .toEqual([{ parameters: ['service:registry:nexus:type', 'service:registry:nexus:registry'] }])
+    expect(def.feature('parameterLayout', { mode: 'create' })).toEqual([])
+    expect(def.feature('parameterLayout', {})).toEqual([])
+  })
+
   it('renderFeatures is a home link to the node base URL, trailing slash trimmed', () => {
     def.install()
     const vnodes = def.feature('renderFeatures', {

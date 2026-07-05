@@ -86,4 +86,13 @@ function renderDetailsFeatures(subscription) {
   return [renderDetailsChip({ icon: 'mdi-package-variant', text: String(components), title: t('service:registry:nexus:components') })]
 }
 
-export default { renderFeatures, renderDetailsKey, renderDetailsFeatures }
+/**
+ * Subscribe-wizard parameter layout. At subscription time in LINK mode, show
+ * the repository type before the registry (the wizard's default is name
+ * ascending). Other modes keep the default order.
+ */
+function parameterLayout({ mode } = {}) {
+  return String(mode).toLowerCase() === 'link' ? [{ parameters: [PARAM_TYPE, PARAM_REGISTRY] }] : []
+}
+
+export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout }
