@@ -1,16 +1,6 @@
 package org.ligoj.app.plugin.registry.nexus;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.absent;
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
 import jakarta.transaction.Transactional;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.junit.jupiter.api.Assertions;
@@ -18,11 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.ligoj.app.AbstractServerTest;
-import org.ligoj.app.model.Node;
-import org.ligoj.app.model.Parameter;
-import org.ligoj.app.model.ParameterValue;
-import org.ligoj.app.model.Project;
-import org.ligoj.app.model.Subscription;
+import org.ligoj.app.model.*;
 import org.ligoj.app.resource.subscription.SubscriptionResource;
 import org.ligoj.bootstrap.MatcherUtil;
 import org.ligoj.bootstrap.core.validation.ValidationJsonException;
@@ -31,6 +17,11 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
 /**
  * Test class of {@link NexusPluginResource}
@@ -52,7 +43,7 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	@BeforeEach
 	void prepareData() throws IOException {
 		persistEntities("csv",
-				new Class<?>[] { Node.class, Parameter.class, Project.class, Subscription.class, ParameterValue.class },
+				new Class<?>[]{Node.class, Parameter.class, Project.class, Subscription.class, ParameterValue.class},
 				StandardCharsets.UTF_8);
 		this.subscription = getSubscription("Jupiter", NexusPluginResource.KEY);
 
@@ -79,7 +70,7 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
-	void checkStatus() throws Exception {
+	void checkStatus() {
 		httpServer.stubFor(get(urlPathEqualTo("/service/rest/v1/repositories"))
 				.willReturn(aResponse().withStatus(HttpStatus.SC_OK).withBody("[]")));
 		httpServer.start();
@@ -158,7 +149,7 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
-	void findAllByNameNoListing() throws IOException {
+	void findAllByNameNoListing() {
 		httpServer.start();
 		final var repositories = resource.findAllByName("service:registry:nexus:dig", "maven", null);
 		Assertions.assertEquals(0, repositories.size());

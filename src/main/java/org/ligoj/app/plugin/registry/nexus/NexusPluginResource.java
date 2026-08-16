@@ -1,18 +1,7 @@
 package org.ligoj.app.plugin.registry.nexus;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.HttpMethod;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.ligoj.app.api.SubscriptionStatusWithData;
@@ -31,9 +20,13 @@ import org.ligoj.bootstrap.core.validation.ValidationJsonException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Sonatype Nexus artifact registry resource. Nexus is multi-format, so the
@@ -114,7 +107,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 
 	@Override
 	public boolean checkStatus(final Map<String, String> parameters) {
-		// Node validation: authenticated call to the repositories endpoint.
+		// Node validation: authenticated call to the repositories' endpoint.
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/service/rest/v1/repositories",
 				null);
 		try (var processor = newProcessor(parameters)) {
@@ -126,7 +119,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	 * Validate the subscription registry (the Nexus repository) and return it.
 	 * Throws when the repository cannot be resolved.
 	 */
-	private NexusRepository validateRegistry(final Map<String, String> parameters) throws IOException {
+	private NexusRepository validateRegistry(final Map<String, String> parameters) {
 		final var registry = parameters.get(PARAMETER_REGISTRY);
 		final var request = new CurlRequest(HttpMethod.GET,
 				getBaseUrl(parameters) + "/service/rest/v1/repositories/" + registry, null);
@@ -147,7 +140,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	}
 
 	@Override
-	public SubscriptionStatusWithData checkSubscriptionStatus(final Map<String, String> parameters) throws IOException {
+	public SubscriptionStatusWithData checkSubscriptionStatus(final Map<String, String> parameters) {
 		final var status = new SubscriptionStatusWithData();
 		final var repository = validateRegistry(parameters);
 		status.put("format", repository.getFormat());
@@ -163,9 +156,8 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	 * @param parameters The node/subscription parameters.
 	 * @param registry   The repository name.
 	 * @return The total number of components.
-	 * @throws IOException When a Nexus response cannot be read.
 	 */
-	private int countComponents(final Map<String, String> parameters, final String registry) throws IOException {
+	private int countComponents(final Map<String, String> parameters, final String registry) {
 		int total = 0;
 		String token = null;
 		do {
@@ -192,12 +184,11 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	 *                 repositories by their Nexus format. When blank, all formats
 	 *                 match.
 	 * @return The matching repository names.
-	 * @throws IOException When the Nexus response cannot be read.
 	 */
 	@GET
 	@Path("{node}/{criteria}")
 	public List<NamedBean<String>> findAllByName(@PathParam("node") final String node,
-			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) throws IOException {
+			@PathParam("criteria") final String criteria, @QueryParam("type") final String type) {
 		final var parameters = pvResource.getNodeParameters(node);
 		final var request = new CurlRequest(HttpMethod.GET, getBaseUrl(parameters) + "/service/rest/v1/repositories",
 				null);
@@ -209,7 +200,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 		if (found) {
 			final List<NexusRepository> repositories = objectMapper.readValue(
 					StringUtils.defaultIfBlank(request.getResponse(), "[]"),
-					new TypeReference<List<NexusRepository>>() {
+					new TypeReference<>() {
 						// Nothing to extend
 					});
 			final var format = new NormalizeFormat();
