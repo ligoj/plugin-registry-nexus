@@ -1,4 +1,4 @@
-package org.ligoj.app.plugin.registry.nexus.client;
+package org.ligoj.app.plugin.nexus.client;
 
 import java.util.ArrayList;
 import java.util.List;

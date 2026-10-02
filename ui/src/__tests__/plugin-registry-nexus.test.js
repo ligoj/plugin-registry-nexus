@@ -60,16 +60,36 @@ describe('plugin-registry-nexus manifest', () => {
     expect(() => def.feature('nope')).toThrow(/Plugin "registry-nexus" has no feature "nope"/)
   })
 
-  it('parameterLayout orders type before registry only on a link subscription', () => {
-    expect(def.feature('parameterLayout', { mode: 'link', isNode: false }))
-      .toEqual([{ parameters: ['service:registry:nexus:type', 'service:registry:nexus:registry'] }])
-    // Node context defers to the parent registry's connection ordering.
-    expect(def.feature('parameterLayout', { mode: 'link', isNode: true })).toEqual([])
-    expect(def.feature('parameterLayout', { mode: 'create' })).toEqual([])
-    expect(def.feature('parameterLayout', {})).toEqual([])
+  it('parameterLayout orders type before registry on a link subscription, then the JSON settings on a creation', () => {
+    const { parameterLayout } = def.service
+    expect(parameterLayout({ mode: 'link' })).toEqual([{ parameters: ['service:registry:nexus:type', 'service:registry:nexus:registry'] }])
+    expect(parameterLayout({ mode: 'CREATE' })).toEqual([{ parameters: ['service:registry:nexus:type', 'service:registry:nexus:registry',
+      'service:registry:nexus:configuration', 'service:registry:nexus:roles'] }])
+    expect(parameterLayout({ mode: 'link', isNode: true })).toEqual([])
+    expect(parameterLayout({})).toEqual([])
+    expect(parameterLayout()).toEqual([])
   })
 
-  it('renderFeatures is a home link to the node base URL, trailing slash trimmed', () => {
+  it('parameterField: JSON inputs for the CREATE settings, a free name for the created registry', () => {
+    const { parameterField } = def.service
+    const field = (id, mode, isNode = false) => parameterField({ parameter: { id }, mode, isNode })
+    expect(field('service:registry:nexus:configuration', 'create')?.__name).toBe('NexusJsonField')
+    expect(field('service:registry:nexus:roles', 'create')?.__name).toBe('NexusJsonField')
+    expect(field('service:registry:nexus:registry', 'CREATE')?.__name).toBe('NexusRegistryNameField')
+    // Link mode: the parent's repository search applies
+    expect(field('service:registry:nexus:registry', 'link')).toBeNull()
+    expect(field('service:registry:nexus:type', 'create')).toBeNull()
+    expect(field('service:registry:nexus:roles', 'create', true)).toBeNull()
+  })
+
+  it('resolves the SELECT index of the appended types', () => {
+    expect(def.service.resolveType('5')).toBe('yum')
+    expect(def.service.resolveType('11')).toBe('gitlfs')
+    expect(def.service.resolveType('maven')).toBe('maven')
+  })
+
+
+  it('renderFeatures links to the browse view of the subscription repository, trailing slash trimmed', () => {
     def.install()
     const vnodes = def.feature('renderFeatures', {
       parameters: { 'service:registry:nexus:url': 'https://nexus.acme.io/', 'service:registry:nexus:registry': 'maven-releases' },
@@ -77,8 +97,17 @@ describe('plugin-registry-nexus manifest', () => {
     expect(vnodes).toHaveLength(1)
     expect(vnodes[0].__v_isVNode).toBe(true)
     expect(vnodes[0].props.target).toBe('_blank')
-    expect(vnodes[0].props.href).toBe('https://nexus.acme.io')
+    expect(vnodes[0].props.href).toBe('https://nexus.acme.io/#browse/browse:maven-releases')
     expect(iconOf(vnodes[0])).toBe('mdi-home')
+  })
+
+  it('renderFeatures encodes the repository name, and links to the home page without repository', () => {
+    def.install()
+    const href = (registry) => def.feature('renderFeatures', {
+      parameters: { 'service:registry:nexus:url': 'https://nexus.acme.io', 'service:registry:nexus:registry': registry },
+    })[0].props.href
+    expect(href('team a')).toBe('https://nexus.acme.io/#browse/browse:team%20a')
+    expect(href(undefined)).toBe('https://nexus.acme.io')
   })
 
   it('renderFeatures returns [] without the node URL', () => {

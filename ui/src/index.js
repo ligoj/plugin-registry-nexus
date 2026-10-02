@@ -6,8 +6,10 @@
  * browse link + registry chip) merged in through plugin-registry's
  * `subPluginIdFor` delegation hook.
  *
- * Nexus is multi-format, so the artifact `type` is a real choice
- * (`docker` / `maven` / `nuget` / `npm` / `python`) — see csv/parameter.csv.
+ * Nexus is multi-format, so the artifact `type` is a real choice (docker,
+ * maven, nuget, npm, python, yum, apt, raw, helm, rubygems, r, gitlfs) — see
+ * csv/parameter.csv. In CREATE mode, `parameterField` supplies the JSON
+ * settings / role mapping inputs and the free name of the created repository.
  *
  * Authored as source — compiled to `/main/registry-nexus/vue/index.js`.
  */
@@ -21,6 +23,7 @@ const features = {
   renderDetailsKey: service.renderDetailsKey,
   renderDetailsFeatures: service.renderDetailsFeatures,
   parameterLayout: service.parameterLayout,
+  parameterField: service.parameterField,
 }
 
 export default {

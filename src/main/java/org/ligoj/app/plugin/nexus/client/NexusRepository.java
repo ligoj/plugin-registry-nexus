@@ -1,4 +1,4 @@
-package org.ligoj.app.plugin.registry.nexus.client;
+package org.ligoj.app.plugin.nexus.client;
 
 import org.ligoj.bootstrap.core.NamedBean;
 

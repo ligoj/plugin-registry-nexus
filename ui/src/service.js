@@ -4,8 +4,8 @@
  * Tool-level plugin (lives at `service:registry:nexus`). The parent
  * `plugin-registry` delegates the subscription-row hooks to us:
  *
- *   - renderFeatures        → a "home" link to the Nexus web UI (the node
- *     base URL, i.e. the main tool resource).
+ *   - renderFeatures        → a "home" link to the Nexus browse view of the
+ *     subscription repository (the node base URL without repository).
  *   - renderDetailsKey      → the registry chip, prefixed with the icon of the
  *     configured artifact type, with a two-line tooltip (type + name).
  *   - renderDetailsFeatures → the live component count, refreshed from the
@@ -16,26 +16,9 @@
 import { h } from 'vue'
 import { pluginRegistry, renderServiceLink, renderDetailsChip, useI18nStore, VChip, VIcon, VTooltip } from '@ligoj/host'
 
-const PARAM_URL = 'service:registry:nexus:url'
-const PARAM_TYPE = 'service:registry:nexus:type'
-const PARAM_REGISTRY = 'service:registry:nexus:registry'
-
-/**
- * Artifact types in the SELECT parameter's declared order — MUST match
- * csv/parameter.csv: `["docker","maven","nuget","npm","python"]`. A
- * subscription persists a SELECT as its option INDEX, so this resolves that
- * index back to the value.
- */
-const TYPE_VALUES = ['docker', 'maven', 'nuget', 'npm', 'python']
-
-/**
- * Resolve the stored artifact type. A SELECT is persisted as its option INDEX
- * (e.g. "1"), so map that back to the value; a value passed straight through
- * (e.g. "maven") is kept as-is. Returns "" when there is nothing to resolve.
- */
-function resolveType(raw) {
-  return String(TYPE_VALUES[Number(raw)] ?? raw ?? '').toLowerCase()
-}
+import { PARAM_URL, PARAM_TYPE, PARAM_REGISTRY, PARAM_CONFIGURATION, PARAM_ROLES, resolveType } from './types.js'
+import NexusJsonField from './fields/NexusJsonField.vue'
+import NexusRegistryNameField from './fields/NexusRegistryNameField.vue'
 
 /**
  * Artifact-type icon as a VNode, drawn by the shared RegistryTypeIcon that the
@@ -52,12 +35,16 @@ function typeIconVNode(type, attrs = {}) {
   return h(VIcon, attrs, () => 'mdi-package-variant')
 }
 
-/** "Home" link to the Nexus web UI (the main tool resource). */
+/** "Home" link to the Nexus browse view of the subscription repository, the Nexus home page without repository. */
 function renderFeatures(subscription) {
   const url = subscription?.parameters?.[PARAM_URL]
   if (!url) return []
   const { t } = useI18nStore()
-  return [renderServiceLink({ icon: 'mdi-home', href: url.replace(/\/+$/, ''), title: t('service:registry:nexus') })]
+  const base = url.replace(/\/+$/, '')
+  const registry = subscription.parameters[PARAM_REGISTRY]
+  // Nexus 3 UI route of a repository content: #browse/browse:<repository>
+  const href = registry ? `${base}/#browse/browse:${encodeURIComponent(registry)}` : base
+  return [renderServiceLink({ icon: 'mdi-home', href, title: t('service:registry:nexus') })]
 }
 
 /**
@@ -87,14 +74,29 @@ function renderDetailsFeatures(subscription) {
 }
 
 /**
- * Subscribe-wizard parameter layout. At subscription time in LINK mode, show
- * the repository type before the registry (the wizard's default is name
- * ascending). In node context (isNode) we return nothing so the parent
- * registry plugin's connection ordering (url, user, secret) applies; other
- * subscription modes keep the default order.
+ * Subscribe-wizard parameter layout: the repository type before the registry (the wizard's default is name
+ * ascending), then on a creation the format settings and the role mapping. In node context (isNode) we return nothing
+ * so the parent registry plugin's connection ordering (url, user, secret) applies.
  */
 function parameterLayout({ mode, isNode } = {}) {
-  return !isNode && String(mode).toLowerCase() === 'link' ? [{ parameters: [PARAM_TYPE, PARAM_REGISTRY] }] : []
+  if (isNode) return []
+  const m = String(mode).toLowerCase()
+  if (m === 'link') return [{ parameters: [PARAM_TYPE, PARAM_REGISTRY] }]
+  if (m === 'create') return [{ parameters: [PARAM_TYPE, PARAM_REGISTRY, PARAM_CONFIGURATION, PARAM_ROLES] }]
+  return []
 }
 
-export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout }
+/**
+ * Subscribe-wizard fields of the CREATE mode: JSON inputs for the format settings and the role mapping, and a free
+ * name for the repository to create. Everything else, including the registry search of the LINK mode and the type
+ * picker, falls back to the parent plugin-registry (null).
+ */
+function parameterField({ parameter, mode, isNode } = {}) {
+  if (isNode) return null
+  const id = parameter?.id
+  if (id === PARAM_CONFIGURATION || id === PARAM_ROLES) return NexusJsonField
+  if (id === PARAM_REGISTRY && String(mode).toLowerCase() === 'create') return NexusRegistryNameField
+  return null
+}
+
+export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout, parameterField, resolveType }

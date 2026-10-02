@@ -2,5 +2,7 @@ id;owner.id;data;mandatory;type;mode;secured;defaultValue;availableForSubscripti
 service:registry:nexus:url;service:registry:nexus;;true;TEXT;;;;FALSE;
 service:registry:nexus:user;service:registry:nexus;;true;TEXT;;;;FALSE;
 service:registry:nexus:password;service:registry:nexus;;true;TEXT;;true;;FALSE;
-service:registry:nexus:type;service:registry:nexus;["docker","maven","nuget","npm","python"];true;SELECT;;;;;FALSE
+service:registry:nexus:type;service:registry:nexus;["docker","maven","nuget","npm","python","yum","apt","raw","helm","rubygems","r","gitlfs"];true;SELECT;;;;;FALSE
 service:registry:nexus:registry;service:registry:nexus;;true;TEXT;;;;;FALSE
+service:registry:nexus:configuration;service:registry:nexus;;false;TEXT;CREATE;true;;;FALSE
+service:registry:nexus:roles;service:registry:nexus;;false;TEXT;CREATE;;;;FALSE
