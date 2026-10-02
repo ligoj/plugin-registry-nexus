@@ -4,13 +4,13 @@
     <parent>
         <groupId>org.ligoj.api</groupId>
         <artifactId>plugin-parent</artifactId>
-        <version>5.0.0</version>
+        <version>5.0.3</version>
         <relativePath/>
     </parent>
 
     <groupId>org.ligoj.plugin</groupId>
     <artifactId>plugin-registry-nexus</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>5.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Ligoj - Plugin Registry - Nexus</name>
     <url>https://github.com/ligoj/plugin-registry-nexus</url>
@@ -25,7 +25,7 @@
         <dependency>
             <groupId>org.ligoj.plugin</groupId>
             <artifactId>plugin-registry</artifactId>
-            <version>[1.0.0-SNAPSHOT,1.1.0)</version>
+            <version>[5.0.0-SNAPSHOT,5.1.0)</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
