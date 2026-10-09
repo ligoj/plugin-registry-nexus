@@ -14,7 +14,7 @@ export default {
   "service:registry:nexus:configuration": "Paramètres du dépôt (JSON)",
   "service:registry:nexus:configuration-description": "Objet JSON optionnel fusionné avec les valeurs par défaut du format, tel qu'attendu par l'API des dépôts Nexus : storage, cleanup, maven, docker, yum, apt + aptSigning (obligatoire pour APT), raw…",
   "service:registry:nexus:roles": "Correspondance des rôles (JSON)",
-  "service:registry:nexus:roles-description": "Objet JSON optionnel indexé par groupe : \"view-permissions\" et/ou \"admin-permissions\" parmi browse, read, edit, add, delete et *. Chaque groupe obtient les privilèges via le rôle Nexus de même nom",
+  "service:registry:nexus:roles-description": "Objet JSON optionnel indexé par groupe : \"view-permissions\" et/ou \"admin-permissions\" parmi browse, read, edit, add, delete et *, et un \"content-selector\" optionnel limitant le groupe au contenu correspondant à son \"expression\" avec ses propres \"permissions\". Chaque groupe obtient les privilèges via le rôle Nexus de même nom",
   "error.rule.nexus-registry": "Dépôt {registry} introuvable dans Nexus",
   "error.rule.nexus-registry-name": "Nom de dépôt invalide : lettres, chiffres, '-', '_' et '.' uniquement, sans commencer par '_' ou '.'",
   "error.rule.nexus-registry-exists": "Un dépôt de ce nom existe déjà avec un autre format ou type : {format}",
@@ -31,5 +31,9 @@ export default {
   "warning.nexus-delete-registry-failed": "La suppression du dépôt Nexus {registry} a échoué : supprimez-le manuellement dans Nexus",
   "warning.nexus-delete-role-failed": "Le retrait des privilèges de {registry} du rôle Nexus {role} a échoué : mettez à jour le rôle manuellement dans Nexus",
   "error.nexus-access-denied": "Nexus a refusé l'accès de l'utilisateur {0} (HTTP {1}) : vérifiez l'utilisateur et le mot de passe du nœud Nexus, et que cet utilisateur peut gérer les dépôts et les rôles",
-  "error.nexus-no-response": "Nexus à l'adresse {0} n'a pas répondu : vérifiez qu'il est démarré et joignable, puis réessayez"
+  "error.nexus-no-response": "Nexus à l'adresse {0} n'a pas répondu : vérifiez qu'il est démarré et joignable, puis réessayez",
+  "error.rule.nexus-roles-selector": "Le sélecteur de contenu du groupe {group} nécessite une expression et au moins une permission",
+  "error.nexus-selector-failed": "L'enregistrement du sélecteur de contenu Nexus {0} a échoué : {1}",
+  "error.nexus-privilege-failed": "L'enregistrement du privilège Nexus {0} du sélecteur de contenu a échoué : {1}",
+  "warning.nexus-delete-selector-failed": "La suppression du sélecteur de contenu Nexus {selector} de {registry} ou de son privilège a échoué : supprimez-les manuellement dans Nexus"
 }

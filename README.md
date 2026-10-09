@@ -95,7 +95,8 @@ The configuration is a secured parameter (encrypted in database): it may hold th
 `read`, `edit`, `add`, `delete` and `*`:
 
 - `view-permissions`: content actions, privileges `nx-repository-view-<format>-<repository>-<action>`;
-- `admin-permissions`: repository administration actions, privileges `nx-repository-admin-<format>-<repository>-<action>`.
+- `admin-permissions`: repository administration actions, privileges `nx-repository-admin-<format>-<repository>-<action>`;
+- `content-selector`: optional, restricts actions to a part of the repository content, see below.
 
 These privileges exist for every repository format, so the same mapping applies to Maven, Python, YUM, APT, Docker...
 The privileges are granted through the Nexus role having the group name as identifier, which Nexus maps to the
@@ -105,12 +106,36 @@ and roles.
 ```json
 {
   "admin": { "view-permissions": ["*"], "admin-permissions": ["*"] },
-  "dev": { "view-permissions": ["browse", "read", "delete", "add"], "admin-permissions": ["browse", "read", "delete"] },
+  "dev": {
+    "view-permissions": ["browse"],
+    "content-selector": {
+      "permissions": ["browse", "read", "delete", "add"],
+      "expression": "format == \"maven2\" and path =^ \"/org\""
+    }
+  },
   "test": { "view-permissions": ["browse"] }
 }
 ```
 
 For a Maven repository `mvn-demo`, the `test` group gets the privilege `nx-repository-view-maven2-mvn-demo-browse`.
+
+#### Content selector
+
+A `content-selector` grants its own `permissions` (same actions) on the content of the repository matching its
+`expression`, written in the Nexus [content selector language (CSEL)](https://help.sonatype.com/en/content-selectors.html),
+e.g. `format == "maven2" and path =^ "/org"`. A role may have a content selector only, or a content selector and the
+other permissions. For each group declaring one, the subscription creates, or updates when they exist:
+
+- the content selector named `<repository>-<group>`, the characters Nexus refuses in a name being replaced by `-`;
+- the privilege of the same name, of type `repository-content-selector`, bound to this repository only, with the
+  permissions as actions (`*` being `ALL`). Its format is `*`, as when the privilege is created in the Nexus UI: the
+  permission only depends on the repository, but the Nexus UI shows a privilege having a format as "(All <format>
+  Repositories)";
+- this privilege in the role of the group.
+
+With the sample above on `mvn-demo`, the `dev` group can browse the whole repository, and read, delete and deploy only
+under `/org`, through the selector and privilege `mvn-demo-dev`. Nexus validates the expression: a rejected one stops
+the subscription with the Nexus message.
 
 ### Subscription sample
 
@@ -145,7 +170,7 @@ its role mapping, sent with `POST rest/node` and `POST rest/subscription`:
     },
     {
       "parameter": "service:registry:nexus:roles",
-      "text": "{\"admin\": {\"view-permissions\": [\"*\"], \"admin-permissions\": [\"*\"]}, \"dev\": {\"view-permissions\": [\"browse\", \"read\", \"delete\", \"add\"], \"admin-permissions\": [\"browse\", \"read\", \"delete\"]}, \"test\": {\"view-permissions\": [\"browse\"]}}"
+      "text": "{\"admin\": {\"view-permissions\": [\"*\"], \"admin-permissions\": [\"*\"]}, \"dev\": {\"view-permissions\": [\"browse\"], \"content-selector\": {\"permissions\": [\"browse\", \"read\", \"delete\", \"add\"], \"expression\": \"format == \\\"maven2\\\" and path =^ \\\"/org\\\"\"}}, \"test\": {\"view-permissions\": [\"browse\"]}}"
     }
   ]
 }
@@ -165,9 +190,10 @@ same payload takes `"index": 6` and a configuration such as
 
 ### Deletion
 
-Deleting the subscription with the "remote data" option removes the privileges of the repository from the mapped
-roles (a role left without privilege nor role is deleted), then deletes the repository. Remote data already partially
-deleted is tolerated: each issue (repository missing, deletion or role update failing) is reported as a warning
+Deleting the subscription with the "remote data" option removes the privileges of the repository, content selector
+privileges included, from the mapped roles (a role left without privilege nor role is deleted), deletes the content
+selector privileges and the content selectors, then deletes the repository. Remote data already partially
+deleted is tolerated: each issue (repository missing, deletion, role update or content selector deletion failing) is reported as a warning
 (`X-Ligoj-Warning` header, shown as a toast in the UI) without blocking the unsubscription.
 
 ## Backend (Java) module

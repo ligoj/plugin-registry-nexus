@@ -14,7 +14,7 @@ export default {
   "service:registry:nexus:configuration": "Repository settings (JSON)",
   "service:registry:nexus:configuration-description": "Optional JSON object merged over the defaults of the format, as the Nexus repository API expects it: storage, cleanup, maven, docker, yum, apt + aptSigning (required for APT), raw…",
   "service:registry:nexus:roles": "Role mapping (JSON)",
-  "service:registry:nexus:roles-description": "Optional JSON object keyed by group: \"view-permissions\" and/or \"admin-permissions\" among browse, read, edit, add, delete and *. Each group gets the privileges through the Nexus role of the same name",
+  "service:registry:nexus:roles-description": "Optional JSON object keyed by group: \"view-permissions\" and/or \"admin-permissions\" among browse, read, edit, add, delete and *, and an optional \"content-selector\" restricting the group to the content matching its \"expression\" with its own \"permissions\". Each group gets the privileges through the Nexus role of the same name",
   "error.rule.nexus-registry": "Repository {registry} not found in Nexus",
   "error.rule.nexus-registry-name": "Invalid repository name: letters, digits, '-', '_' and '.' only, not starting with '_' or '.'",
   "error.rule.nexus-registry-exists": "A repository with this name already exists with another format or type: {format}",
@@ -31,5 +31,9 @@ export default {
   "warning.nexus-delete-registry-failed": "Deleting the Nexus repository {registry} failed: delete it manually in Nexus",
   "warning.nexus-delete-role-failed": "Removing the privileges of {registry} from the Nexus role {role} failed: update the role manually in Nexus",
   "error.nexus-access-denied": "Nexus refused the access of user {0} (HTTP {1}): check the user and password of the Nexus node, and that this user may manage repositories and roles",
-  "error.nexus-no-response": "Nexus at {0} did not respond: check it is running and reachable, then retry"
+  "error.nexus-no-response": "Nexus at {0} did not respond: check it is running and reachable, then retry",
+  "error.rule.nexus-roles-selector": "The content selector of group {group} needs an expression and at least one permission",
+  "error.nexus-selector-failed": "Saving the Nexus content selector {0} failed: {1}",
+  "error.nexus-privilege-failed": "Saving the Nexus privilege {0} of the content selector failed: {1}",
+  "warning.nexus-delete-selector-failed": "Deleting the Nexus content selector {selector} of {registry} or its privilege failed: delete them manually in Nexus"
 }

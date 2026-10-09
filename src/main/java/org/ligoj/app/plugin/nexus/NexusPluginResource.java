@@ -206,7 +206,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 			return;
 		}
 		final var manager = newManager(parameters);
-		manager.revoke(format, name, parseRoles(parameters.get(PARAMETER_ROLES)).keySet());
+		manager.revoke(format, name, parseRoles(parameters.get(PARAMETER_ROLES)));
 		manager.deleteRepository(name);
 	}
 
@@ -230,7 +230,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 
 	/**
 	 * Parse and validate the role mapping, trimmed first: a JSON object keyed by group, each role granting at least one
-	 * known action.
+	 * known action. A content selector needs an expression and at least one known action.
 	 */
 	private Map<String, NexusRole> parseRoles(final String raw) {
 		final var json = StringUtils.trimToNull(raw);
@@ -253,6 +253,15 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 			final var actions = new ArrayList<String>();
 			actions.addAll(CollectionUtils.emptyIfNull(role.getViewPermissions()));
 			actions.addAll(CollectionUtils.emptyIfNull(role.getAdminPermissions()));
+			final var selector = role.getContentSelector();
+			if (selector != null) {
+				// A content selector needs an expression and its own permissions
+				if (StringUtils.isBlank(selector.getExpression()) || CollectionUtils.isEmpty(selector.getPermissions())) {
+					throw new ValidationJsonException(PARAMETER_ROLES, "nexus-roles-selector", "group", group);
+				}
+				selector.setExpression(selector.getExpression().trim());
+				actions.addAll(selector.getPermissions());
+			}
 			if (actions.isEmpty()) {
 				throw new ValidationJsonException(PARAMETER_ROLES, "nexus-roles-empty", "group", group);
 			}

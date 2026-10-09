@@ -48,6 +48,15 @@ class NexusPluginResourceCreateTest extends AbstractServerTest {
 
 	private static final String REPOSITORY = "/service/rest/v1/repositories/maven-releases";
 	private static final String ROLES = "/service/rest/v1/security/roles";
+	private static final String SELECTORS = "/service/rest/v1/security/content-selectors";
+	private static final String PRIVILEGES = "/service/rest/v1/security/privileges";
+
+	/**
+	 * A role with a content selector, as in the documentation.
+	 */
+	private static final String ROLES_SELECTOR = """
+			{"dev": { "view-permissions": ["browse"],
+			  "content-selector": { "permissions": ["browse", "read", "delete"], "expression": "format == \\"maven2\\" and path =^ \\"/org\\"" } } }""";
 
 	/**
 	 * The role mapping of the documentation.
@@ -412,6 +421,165 @@ class NexusPluginResourceCreateTest extends AbstractServerTest {
 		final var e = Assertions.assertThrows(BusinessException.class, () -> resource.create(subscription));
 		Assertions.assertEquals("nexus-role-failed", e.getMessage());
 		Assertions.assertEquals(List.of("dev", "Privilege missing does not exist"), List.of(e.getParameters()));
+	}
+
+	private void stubExistingRepository() {
+		httpServer.stubFor(get(urlEqualTo(REPOSITORY)).willReturn(aResponse().withStatus(HttpStatus.SC_OK)
+				.withBody("{\"name\":\"maven-releases\",\"format\":\"maven2\",\"type\":\"hosted\"}")));
+	}
+
+	/**
+	 * A content selector restricts the group to the matching content: the selector and the privilege of the same name,
+	 * bound to the repository, are created, then the privilege is granted through the role of the group. The privilege
+	 * format is "*", as stored by the Nexus UI, which shows a privilege having a format as "(All maven2 Repositories)".
+	 */
+	@Test
+	void createContentSelector() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES, ROLES_SELECTOR);
+		stubExistingRepository();
+		httpServer.stubFor(get(urlEqualTo(SELECTORS + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(SELECTORS)).withRequestBody(equalToJson("""
+				{"name":"maven-releases-dev","description":"Ligoj: content of maven-releases for group dev",
+				 "expression":"format == \\"maven2\\" and path =^ \\"/org\\""}"""))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(get(urlEqualTo(PRIVILEGES + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(PRIVILEGES + "/repository-content-selector")).withRequestBody(equalToJson("""
+				{"name":"maven-releases-dev","description":"Ligoj: content of maven-releases for group dev",
+				 "actions":["BROWSE","READ","DELETE"],"format":"*","repository":"maven-releases","contentSelector":"maven-releases-dev"}"""))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_CREATED)));
+		stubRoleMissing("dev");
+		httpServer.stubFor(post(urlEqualTo(ROLES))
+				.withRequestBody(matchingJsonPath("$.privileges", WireMock.equalToJson("[\"nx-repository-view-maven2-maven-releases-browse\",\"maven-releases-dev\"]")))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_OK).withBody("{}")));
+		httpServer.start();
+
+		resource.create(subscription);
+		httpServer.verify(1, postRequestedFor(urlEqualTo(SELECTORS)));
+		httpServer.verify(1, postRequestedFor(urlEqualTo(PRIVILEGES + "/repository-content-selector")));
+		httpServer.verify(1, postRequestedFor(urlEqualTo(ROLES)));
+	}
+
+	/**
+	 * The selector and its privilege already exist (a new subscription on the same repository): updated. The group
+	 * name is made a valid Nexus name, "*" is the "ALL" action, and a selector alone is enough for a role.
+	 */
+	@Test
+	void createContentSelectorUpdate() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES,
+				"{\"team a\":{\"content-selector\":{\"permissions\":[\"*\"],\"expression\":\" path =^ \\\"/com\\\" \"}}}");
+		stubExistingRepository();
+		httpServer.stubFor(get(urlEqualTo(SELECTORS + "/maven-releases-team-a")).willReturn(aResponse().withStatus(HttpStatus.SC_OK)
+				.withBody("{\"name\":\"maven-releases-team-a\",\"type\":\"csel\",\"expression\":\"old\"}")));
+		httpServer.stubFor(put(urlEqualTo(SELECTORS + "/maven-releases-team-a")).withRequestBody(equalToJson("""
+				{"description":"Ligoj: content of maven-releases for group team a","expression":"path =^ \\"/com\\""}"""))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(get(urlEqualTo(PRIVILEGES + "/maven-releases-team-a")).willReturn(aResponse().withStatus(HttpStatus.SC_OK).withBody("{}")));
+		httpServer.stubFor(put(urlEqualTo(PRIVILEGES + "/repository-content-selector/maven-releases-team-a"))
+				.withRequestBody(matchingJsonPath("$.actions", WireMock.equalToJson("[\"ALL\"]")))
+				.withRequestBody(matchingJsonPath("$.format", WireMock.equalTo("*")))
+				.withRequestBody(matchingJsonPath("$.repository", WireMock.equalTo("maven-releases")))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(get(urlEqualTo(ROLES + "/team%20a")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(ROLES)).withRequestBody(matchingJsonPath("$.privileges", WireMock.equalToJson("[\"maven-releases-team-a\"]")))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_OK).withBody("{}")));
+		httpServer.start();
+
+		resource.create(subscription);
+		httpServer.verify(1, putRequestedFor(urlEqualTo(SELECTORS + "/maven-releases-team-a")));
+		httpServer.verify(1, putRequestedFor(urlEqualTo(PRIVILEGES + "/repository-content-selector/maven-releases-team-a")));
+		httpServer.verify(0, postRequestedFor(urlEqualTo(SELECTORS)));
+	}
+
+	/**
+	 * A content selector needs an expression and at least one known permission.
+	 */
+	@Test
+	void createContentSelectorInvalid() {
+		httpServer.start();
+		setParameter(NexusPluginResource.PARAMETER_ROLES, "{\"dev\":{\"content-selector\":{\"permissions\":[\"read\"],\"expression\":\" \"}}}");
+		MatcherUtil.assertThrows(Assertions.assertThrows(ValidationJsonException.class, () -> resource.create(subscription)),
+				NexusPluginResource.PARAMETER_ROLES, "nexus-roles-selector");
+		setParameter(NexusPluginResource.PARAMETER_ROLES, "{\"dev\":{\"content-selector\":{\"permissions\":[],\"expression\":\"path =^ \\\"/org\\\"\"}}}");
+		MatcherUtil.assertThrows(Assertions.assertThrows(ValidationJsonException.class, () -> resource.create(subscription)),
+				NexusPluginResource.PARAMETER_ROLES, "nexus-roles-selector");
+		setParameter(NexusPluginResource.PARAMETER_ROLES, "{\"dev\":{\"content-selector\":{\"permissions\":[\"write\"],\"expression\":\"path =^ \\\"/org\\\"\"}}}");
+		MatcherUtil.assertThrows(Assertions.assertThrows(ValidationJsonException.class, () -> resource.create(subscription)),
+				NexusPluginResource.PARAMETER_ROLES, "nexus-roles-permission");
+		httpServer.verify(0, anyRequestedFor(anyUrl()));
+	}
+
+	/**
+	 * Nexus rejects the expression: its message is reported, even as a single error object.
+	 */
+	@Test
+	void createContentSelectorFailed() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES, ROLES_SELECTOR);
+		stubExistingRepository();
+		httpServer.stubFor(get(urlEqualTo(SELECTORS + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(SELECTORS)).willReturn(aResponse().withStatus(HttpStatus.SC_BAD_REQUEST)
+				.withBody("{\"id\":\"*\",\"message\":\"Invalid CSEL: unexpected token\"}")));
+		httpServer.start();
+		final var e = Assertions.assertThrows(BusinessException.class, () -> resource.create(subscription));
+		Assertions.assertEquals("nexus-selector-failed", e.getMessage());
+		Assertions.assertEquals(List.of("maven-releases-dev", "Invalid CSEL: unexpected token"), List.of(e.getParameters()));
+	}
+
+	@Test
+	void createContentSelectorPrivilegeFailed() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES, ROLES_SELECTOR);
+		stubExistingRepository();
+		httpServer.stubFor(get(urlEqualTo(SELECTORS + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(SELECTORS)).willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(get(urlEqualTo(PRIVILEGES + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(post(urlEqualTo(PRIVILEGES + "/repository-content-selector")).willReturn(aResponse().withStatus(HttpStatus.SC_BAD_REQUEST)
+				.withBody("[{\"id\":\"PARAMETER name\",\"message\":\"Name is already used\"}]")));
+		httpServer.start();
+		final var e = Assertions.assertThrows(BusinessException.class, () -> resource.create(subscription));
+		Assertions.assertEquals("nexus-privilege-failed", e.getMessage());
+		Assertions.assertEquals(List.of("maven-releases-dev", "Name is already used"), List.of(e.getParameters()));
+	}
+
+	/**
+	 * Remote data deletion with a content selector: the privilege is removed from the role, then the privilege and
+	 * the selector are deleted, then the repository.
+	 */
+	@Test
+	void deleteRemoteContentSelector() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES, ROLES_SELECTOR);
+		stubRole("dev", "[\"nx-repository-view-maven2-maven-releases-browse\",\"maven-releases-dev\",\"other\"]", "[]");
+		httpServer.stubFor(put(urlEqualTo(ROLES + "/dev")).withRequestBody(matchingJsonPath("$.privileges", WireMock.equalToJson("[\"other\"]")))
+				.willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(delete(urlEqualTo(PRIVILEGES + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.stubFor(delete(urlEqualTo(SELECTORS + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		stubExistingRepository();
+		httpServer.stubFor(delete(urlEqualTo(REPOSITORY)).willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.start();
+
+		resource.delete(subscription, true);
+		httpServer.verify(1, putRequestedFor(urlEqualTo(ROLES + "/dev")));
+		httpServer.verify(1, deleteRequestedFor(urlEqualTo(PRIVILEGES + "/maven-releases-dev")));
+		httpServer.verify(1, deleteRequestedFor(urlEqualTo(SELECTORS + "/maven-releases-dev")));
+		httpServer.verify(1, deleteRequestedFor(urlEqualTo(REPOSITORY)));
+		Assertions.assertEquals(List.of(), warnings);
+	}
+
+	/**
+	 * Partially deleted content selector: a missing privilege or selector is skipped, a failure is a warning.
+	 */
+	@Test
+	void deleteRemoteContentSelectorIssues() {
+		setParameter(NexusPluginResource.PARAMETER_ROLES, ROLES_SELECTOR);
+		stubRoleMissing("dev");
+		httpServer.stubFor(delete(urlEqualTo(PRIVILEGES + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_NOT_FOUND)));
+		httpServer.stubFor(delete(urlEqualTo(SELECTORS + "/maven-releases-dev")).willReturn(aResponse().withStatus(HttpStatus.SC_BAD_REQUEST)
+				.withBody("{\"id\":\"*\",\"message\":\"Content selector is in use\"}")));
+		stubExistingRepository();
+		httpServer.stubFor(delete(urlEqualTo(REPOSITORY)).willReturn(aResponse().withStatus(HttpStatus.SC_NO_CONTENT)));
+		httpServer.start();
+
+		resource.delete(subscription, true);
+		Assertions.assertEquals(List.of("nexus-delete-selector-failed {registry=maven-releases, selector=maven-releases-dev}"), warnings);
+		httpServer.verify(1, deleteRequestedFor(urlEqualTo(REPOSITORY)));
 	}
 
 	/**

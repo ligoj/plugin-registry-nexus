@@ -16,6 +16,17 @@ describe('configurationError', () => {
 })
 
 describe('rolesError', () => {
+  it('accepts a content selector with an expression and its permissions, alone or with the other permissions', () => {
+    const selector = '"content-selector":{"permissions":["browse","read","delete"],"expression":"format == \\"maven2\\" and path =^ \\"/org\\""}'
+    expect(rolesError(`{"dev":{"view-permissions":["browse"],${selector}}}`)).toBeNull()
+    expect(rolesError(`{"dev":{${selector}}}`)).toBeNull()
+  })
+  it('rejects a content selector without expression, without permission, or with an unknown action', () => {
+    expect(rolesError('{"dev":{"content-selector":{"permissions":["read"],"expression":" "}}}')).toBe('error.rule.nexus-roles-selector')
+    expect(rolesError('{"dev":{"content-selector":{"permissions":[],"expression":"path =^ \\"/org\\""}}}')).toBe('error.rule.nexus-roles-selector')
+    expect(rolesError('{"dev":{"content-selector":"path"}}')).toBe('error.rule.nexus-roles-selector')
+    expect(rolesError('{"dev":{"content-selector":{"permissions":["write"],"expression":"path =^ \\"/org\\""}}}')).toBe('error.rule.nexus-roles-permission')
+  })
   it('accepts blank and the documented mapping', () => {
     expect(rolesError(' ')).toBeNull()
     expect(rolesError('{"admin":{"view-permissions":["*"],"admin-permissions":["*"]},"test":{"view-permissions":["browse"]}}')).toBeNull()

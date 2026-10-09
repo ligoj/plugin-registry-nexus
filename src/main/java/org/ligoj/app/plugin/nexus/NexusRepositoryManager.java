@@ -25,8 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
@@ -41,6 +43,10 @@ class NexusRepositoryManager {
 	private static final String REPOSITORIES = "service/rest/v1/repositories/";
 
 	private static final String ROLES = "service/rest/v1/security/roles";
+
+	private static final String SELECTORS = "service/rest/v1/security/content-selectors";
+
+	private static final String PRIVILEGES = "service/rest/v1/security/privileges";
 
 	/**
 	 * Store every response body, whatever its status, the caller deciding from the status: the default callback
@@ -102,18 +108,18 @@ class NexusRepositoryManager {
 	}
 
 	/**
-	 * Human message of a rejected call: the messages of the Nexus validation errors, else the raw body.
+	 * Human message of a rejected call: the messages of the Nexus errors (array or single object), else the raw body.
 	 */
 	private static String reason(final CurlRequest request) {
 		final var body = StringUtils.trimToEmpty(request.getResponse());
 		try {
 			final var json = MAPPER.readTree(body);
-			if (json.isArray()) {
-				final var messages = StreamSupport.stream(json.spliterator(), false).map(e -> e.path("message").asString(""))
-						.filter(StringUtils::isNotBlank).collect(Collectors.joining(", "));
-				if (!messages.isEmpty()) {
-					return messages;
-				}
+			// An array of validation errors, or a single error object
+			final var errors = json.isArray() ? StreamSupport.stream(json.spliterator(), false) : Stream.of(json);
+			final var messages = errors.map(e -> e.path("message").asString("")).filter(StringUtils::isNotBlank)
+					.collect(Collectors.joining(", "));
+			if (!messages.isEmpty()) {
+				return messages;
 			}
 		} catch (final JacksonException e) {
 			// Not JSON, use the raw body
@@ -191,6 +197,9 @@ class NexusRepositoryManager {
 	void grant(final NexusFormat format, final String name, final Map<String, NexusRole> roles) {
 		roles.forEach((group, role) -> {
 			final var privileges = privileges(format, name, role);
+			if (role.getContentSelector() != null) {
+				privileges.add(saveContentSelector(name, group, role.getContentSelector()));
+			}
 			final var existing = findRole(group);
 			final CurlRequest request;
 			if (existing == null) {
@@ -213,37 +222,131 @@ class NexusRepositoryManager {
 	}
 
 	/**
-	 * Remove the privileges of the repository from the roles of the groups. A role left without privileges nor
-	 * roles is deleted. Not blocking: a failure is reported as a warning.
+	 * Name of the content selector of a group on a repository, also the name of its privilege:
+	 * {@code <repository>-<group>}, the characters Nexus refuses in a name being replaced by {@code -}.
+	 *
+	 * @param name  The repository name.
+	 * @param group The group name.
+	 * @return The selector and privilege name.
+	 */
+	static String selectorName(final String name, final String group) {
+		return name + "-" + group.replaceAll("[^a-zA-Z0-9_.\\-]", "-");
+	}
+
+	/**
+	 * Privilege actions of the content selector: upper case, {@code *} being {@code ALL}.
+	 */
+	private static List<String> toActions(final List<String> permissions) {
+		return permissions.stream().map(String::trim).map(a -> "*".equals(a) ? "ALL" : a.toUpperCase(Locale.ROOT)).distinct().toList();
+	}
+
+	/**
+	 * Create, or update when it exists, the content selector of a group and its privilege of the same name, of type
+	 * {@code repository-content-selector} bound to the repository only.
+	 *
+	 * @param name     The repository name.
+	 * @param group    The group name.
+	 * @param selector The content selector definition.
+	 * @return The privilege name.
+	 */
+	private String saveContentSelector(final String name, final String group, final NexusRole.ContentSelector selector) {
+		final var selectorName = selectorName(name, group);
+		final var description = "Ligoj: content of " + name + " for group " + group;
+
+		// The content selector
+		final var content = MAPPER.createObjectNode().put("description", description).put("expression", selector.getExpression());
+		final CurlRequest request;
+		if (exists(SELECTORS + "/" + encode(selectorName))) {
+			request = call(HttpMethod.PUT, SELECTORS + "/" + encode(selectorName), content.toString());
+		} else {
+			request = call(HttpMethod.POST, SELECTORS, MAPPER.createObjectNode().put("name", selectorName).setAll(content).toString());
+		}
+		if (!isOk(request)) {
+			throw new BusinessException("nexus-selector-failed", selectorName, reason(request));
+		}
+
+		// The privilege of the same name, on the selected content of the repository
+		final var privilege = MAPPER.createObjectNode().put("name", selectorName).put("description", description);
+		final var actions = privilege.putArray("actions");
+		toActions(selector.getPermissions()).forEach(actions::add);
+		// Format "*" with the repository name, as stored by the Nexus UI: the permission only depends on the repository,
+		// but the Nexus UI shows a privilege having a format as "(All <format> Repositories)"
+		privilege.put("format", "*").put("repository", name).put("contentSelector", selectorName);
+		final CurlRequest privilegeRequest;
+		if (exists(PRIVILEGES + "/" + encode(selectorName))) {
+			privilegeRequest = call(HttpMethod.PUT, PRIVILEGES + "/repository-content-selector/" + encode(selectorName), privilege.toString());
+		} else {
+			privilegeRequest = call(HttpMethod.POST, PRIVILEGES + "/repository-content-selector", privilege.toString());
+		}
+		if (!isOk(privilegeRequest)) {
+			throw new BusinessException("nexus-privilege-failed", selectorName, reason(privilegeRequest));
+		}
+		log.info("Nexus content selector and privilege {} saved", selectorName);
+		return selectorName;
+	}
+
+	private boolean exists(final String path) {
+		return isOk(call(HttpMethod.GET, path, null));
+	}
+
+	/**
+	 * Delete the privilege, then the content selector of a group. Not blocking: a missing one is skipped, a failure is
+	 * reported as a warning.
+	 */
+	private void deleteContentSelector(final String name, final String group) {
+		final var selectorName = selectorName(name, group);
+		for (final var path : List.of(PRIVILEGES, SELECTORS)) {
+			final var request = call(HttpMethod.DELETE, path + "/" + encode(selectorName), null);
+			if (!isOk(request) && request.getStatus() != 404) {
+				log.warn("Deleting the Nexus {} {} failed: {}", path, selectorName, reason(request));
+				warnings.warn("nexus-delete-selector-failed", ResponseWarnings.parameters("selector", selectorName, "registry", name));
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Remove the privileges of the repository from the roles of the groups, including the content selector privileges.
+	 * A role left without privileges nor roles is deleted. Then the content selectors and their privileges are deleted.
+	 * Not blocking: a failure is reported as a warning.
 	 *
 	 * @param format The repository format.
 	 * @param name   The repository name.
-	 * @param groups The groups of the role mapping.
+	 * @param roles  The role mapping, keyed by group.
 	 */
-	void revoke(final NexusFormat format, final String name, final Iterable<String> groups) {
+	void revoke(final NexusFormat format, final String name, final Map<String, NexusRole> roles) {
 		final var view = "nx-repository-view-" + format.getFormat() + "-" + name + "-";
 		final var admin = "nx-repository-admin-" + format.getFormat() + "-" + name + "-";
-		for (final var group : groups) {
-			final var existing = findRole(group);
-			if (existing == null) {
-				continue;
+		roles.forEach((group, role) -> {
+			revokeRole(name, group, role, view, admin);
+			if (role.getContentSelector() != null) {
+				deleteContentSelector(name, group);
 			}
-			final var privileges = texts(existing.path("privileges"));
-			// An action never contains "-": keep the privileges of another repository sharing this name prefix
-			final var kept = privileges.stream().filter(p -> !isRepositoryPrivilege(p, view) && !isRepositoryPrivilege(p, admin)).toList();
-			final CurlRequest request;
-			if (kept.isEmpty() && texts(existing.path("roles")).isEmpty()) {
-				request = call(HttpMethod.DELETE, ROLES + "/" + encode(group), null);
-			} else if (kept.size() < privileges.size()) {
-				final var array = existing.putArray("privileges");
-				kept.forEach(array::add);
-				request = call(HttpMethod.PUT, ROLES + "/" + encode(group), existing.toString());
-			} else {
-				continue;
-			}
-			if (!isOk(request)) {
-				warnings.warn("nexus-delete-role-failed", ResponseWarnings.parameters("role", group, "registry", name));
-			}
+		});
+	}
+
+	private void revokeRole(final String name, final String group, final NexusRole role, final String view, final String admin) {
+		final var existing = findRole(group);
+		if (existing == null) {
+			return;
+		}
+		final var selectorPrivilege = role.getContentSelector() == null ? null : selectorName(name, group);
+		final var privileges = texts(existing.path("privileges"));
+		// An action never contains "-": keep the privileges of another repository sharing this name prefix
+		final var kept = privileges.stream().filter(p -> !isRepositoryPrivilege(p, view) && !isRepositoryPrivilege(p, admin))
+				.filter(p -> !p.equals(selectorPrivilege)).toList();
+		final CurlRequest request;
+		if (kept.isEmpty() && texts(existing.path("roles")).isEmpty()) {
+			request = call(HttpMethod.DELETE, ROLES + "/" + encode(group), null);
+		} else if (kept.size() < privileges.size()) {
+			final var array = existing.putArray("privileges");
+			kept.forEach(array::add);
+			request = call(HttpMethod.PUT, ROLES + "/" + encode(group), existing.toString());
+		} else {
+			return;
+		}
+		if (!isOk(request)) {
+			warnings.warn("nexus-delete-role-failed", ResponseWarnings.parameters("role", group, "registry", name));
 		}
 	}
 
