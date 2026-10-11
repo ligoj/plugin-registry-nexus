@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Artifact types of the {@value NexusPluginResource#PARAMETER_TYPE} parameter, with the Nexus settings of the hosted
+ * Artifact types of the {@link NexusPluginResource#PARAMETER_TYPE} parameter, with the Nexus settings of the hosted
  * repository created in CREATE mode. The declaration order is the order of the seeded SELECT options: a subscription
  * may persist the option index, so a new type is always appended.
  */
