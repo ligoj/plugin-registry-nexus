@@ -14,6 +14,8 @@ export default {
   "service:registry:nexus:configuration": "Repository settings (JSON)",
   "service:registry:nexus:configuration-description": "Optional JSON object merged over the defaults of the format, as the Nexus repository API expects it: storage, cleanup, maven, docker, yum, apt + aptSigning (required for APT), raw…",
   "service:registry:nexus:roles": "Role mapping (JSON)",
+  "service:registry:nexus:configuration-summary": "No setting | {count} setting: {names} | {count} settings: {names}",
+  "service:registry:nexus:roles-summary": "No role | {count} role: {names} | {count} roles: {names}",
   "service:registry:nexus:roles-description": "Optional JSON object keyed by group: \"view-permissions\" and/or \"admin-permissions\" among browse, read, edit, add, delete and *, and an optional \"content-selector\" restricting the group to the content matching its \"expression\" with its own \"permissions\". Each group gets the privileges through the Nexus role of the same name",
   "error.rule.nexus-registry": "Repository {registry} not found in Nexus",
   "error.rule.nexus-registry-name": "Invalid repository name: letters, digits, '-', '_' and '.' only, not starting with '_' or '.'",

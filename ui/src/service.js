@@ -18,6 +18,7 @@ import { pluginRegistry, renderServiceLink, renderDetailsChip, useI18nStore, VCh
 
 import { PARAM_URL, PARAM_TYPE, PARAM_REGISTRY, PARAM_CONFIGURATION, PARAM_ROLES, resolveType } from './types.js'
 import NexusJsonField from './fields/NexusJsonField.vue'
+import { jsonSummary } from './fields/nexusJson.js'
 import NexusRegistryNameField from './fields/NexusRegistryNameField.vue'
 
 /**
@@ -99,4 +100,12 @@ function parameterField({ parameter, mode, isNode } = {}) {
   return null
 }
 
-export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout, parameterField, resolveType }
+/**
+ * Subscription status tooltip: the JSON settings and role mapping as a short text instead of the raw JSON. Null for
+ * the other parameters, shown as they are.
+ */
+function parameterSummary({ parameter, value } = {}) {
+  return jsonSummary(parameter, value, useI18nStore().t)
+}
+
+export default { renderFeatures, renderDetailsKey, renderDetailsFeatures, parameterLayout, parameterField, parameterSummary, resolveType }

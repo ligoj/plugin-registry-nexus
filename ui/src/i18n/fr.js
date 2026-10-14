@@ -14,6 +14,8 @@ export default {
   "service:registry:nexus:configuration": "Paramètres du dépôt (JSON)",
   "service:registry:nexus:configuration-description": "Objet JSON optionnel fusionné avec les valeurs par défaut du format, tel qu'attendu par l'API des dépôts Nexus : storage, cleanup, maven, docker, yum, apt + aptSigning (obligatoire pour APT), raw…",
   "service:registry:nexus:roles": "Correspondance des rôles (JSON)",
+  "service:registry:nexus:configuration-summary": "Aucun réglage | {count} réglage : {names} | {count} réglages : {names}",
+  "service:registry:nexus:roles-summary": "Aucun rôle | {count} rôle : {names} | {count} rôles : {names}",
   "service:registry:nexus:roles-description": "Objet JSON optionnel indexé par groupe : \"view-permissions\" et/ou \"admin-permissions\" parmi browse, read, edit, add, delete et *, et un \"content-selector\" optionnel limitant le groupe au contenu correspondant à son \"expression\" avec ses propres \"permissions\". Chaque groupe obtient les privilèges via le rôle Nexus de même nom",
   "error.rule.nexus-registry": "Dépôt {registry} introuvable dans Nexus",
   "error.rule.nexus-registry-name": "Nom de dépôt invalide : lettres, chiffres, '-', '_' et '.' uniquement, sans commencer par '_' ou '.'",

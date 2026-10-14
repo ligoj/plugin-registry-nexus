@@ -24,6 +24,7 @@ const features = {
   renderDetailsFeatures: service.renderDetailsFeatures,
   parameterLayout: service.parameterLayout,
   parameterField: service.parameterField,
+  parameterSummary: service.parameterSummary,
 }
 
 export default {

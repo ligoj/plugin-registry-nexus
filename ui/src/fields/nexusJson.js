@@ -55,6 +55,27 @@ export function rolesError(value) {
   return null
 }
 
+/** Groups and settings named in a summary; the others are counted. */
+const SUMMARY_NAMES = 3
+
+/**
+ * Short text of a JSON parameter, for the subscription status tooltip: the role mapping as its groups ("3 roles: admin,
+ * dev, test"), the settings as their sections ("2 settings: storage, cleanup"), the first names only then "+N".
+ *
+ * @param {string} parameter The parameter identifier.
+ * @param {string|null|undefined} value The stored JSON.
+ * @param {Function} t The i18n translation function.
+ * @returns {string|null} The summary, or null for another parameter or a blank or unreadable value.
+ */
+export function jsonSummary(parameter, value, t) {
+  const kind = { 'service:registry:nexus:roles': 'roles', 'service:registry:nexus:configuration': 'configuration' }[parameter]
+  const { json } = kind ? parseObject(value) : {}
+  if (!json) return null
+  const names = Object.keys(json)
+  const shown = names.slice(0, SUMMARY_NAMES).join(', ') + (names.length > SUMMARY_NAMES ? ` +${names.length - SUMMARY_NAMES}` : '')
+  return t(`service:registry:nexus:${kind}-summary`, { count: names.length, names: shown }, names.length)
+}
+
 /** Settings sample per artifact type, shown as placeholder of the configuration input. */
 export const CONFIGURATION_SAMPLES = {
   maven: '{\n  "maven": { "versionPolicy": "SNAPSHOT", "layoutPolicy": "PERMISSIVE" },\n  "storage": { "writePolicy": "ALLOW" }\n}',
