@@ -53,7 +53,7 @@ class NexusPluginResourceTest extends AbstractServerTest {
 	}
 
 	@Test
-	void delete() throws Exception {
+	void delete() {
 		resource.delete(subscription, false);
 		em.flush();
 		em.clear();

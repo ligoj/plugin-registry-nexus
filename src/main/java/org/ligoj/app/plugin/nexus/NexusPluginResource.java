@@ -318,7 +318,7 @@ public class NexusPluginResource extends AbstractToolPluginResource implements R
 	}
 
 	@Override
-	public void link(final int subscription) throws IOException {
+	public void link(final int subscription) {
 		validateRegistry(subscriptionResource.getParameters(subscription));
 	}
 
